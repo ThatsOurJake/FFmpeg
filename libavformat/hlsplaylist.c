@@ -104,7 +104,7 @@ void ff_hls_write_stream_info(AVStream *st, AVIOContext *out, int bandwidth,
 
 void ff_hls_write_playlist_header(AVIOContext *out, int version, int allowcache,
                                   int target_duration, int64_t sequence,
-                                  uint32_t playlist_type, int iframe_mode)
+                                  uint32_t playlist_type, int iframe_mode, float start_offset)
 {
     if (!out)
         return;
@@ -123,6 +123,9 @@ void ff_hls_write_playlist_header(AVIOContext *out, int version, int allowcache,
     }
     if (iframe_mode) {
         avio_printf(out, "#EXT-X-I-FRAMES-ONLY\n");
+    }
+    if (start_offset != 0) {
+        avio_printf(out, "#EXT-X-START:TIME-OFFSET=%f\n", start_offset);
     }
 }
 

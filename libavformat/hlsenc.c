@@ -24,6 +24,7 @@
 #include "config_components.h"
 #include <stdint.h>
 #include <time.h>
+#include <float.h>
 #if HAVE_UNISTD_H
 #include <unistd.h>
 #endif
@@ -206,6 +207,7 @@ typedef struct HLSContext {
     int64_t init_time;     // Set by a private option.
     int max_nb_segments;   // Set by a private option.
     int hls_delete_threshold; // Set by a private option.
+    float start_offset;     // Set by a private option.
     uint32_t flags;        // enum HLSFlags
     uint32_t pl_type;      // enum PlaylistType
     char *segment_filename;
@@ -1590,7 +1592,7 @@ static int hls_window(AVFormatContext *s, int last, VariantStream *vs)
         hls->version = 4;
     }
 
-    if (hls->flags & HLS_INDEPENDENT_SEGMENTS) {
+    if ((hls->flags & HLS_INDEPENDENT_SEGMENTS) || !(hls->start_offset == 0)) {
         hls->version = 6;
     }
 
@@ -1616,7 +1618,7 @@ static int hls_window(AVFormatContext *s, int last, VariantStream *vs)
 
     vs->discontinuity_set = 0;
     ff_hls_write_playlist_header(byterange_mode ? hls->m3u8_out : vs->out, hls->version, hls->allowcache,
-                                 target_duration, sequence, hls->pl_type, hls->flags & HLS_I_FRAMES_ONLY);
+                                 target_duration, sequence, hls->pl_type, hls->flags & HLS_I_FRAMES_ONLY, hls->start_offset);
 
     if ((hls->flags & HLS_DISCONT_START) && sequence==hls->start_sequence && vs->discontinuity_set==0) {
         avio_printf(byterange_mode ? hls->m3u8_out : vs->out, "#EXT-X-DISCONTINUITY\n");
@@ -1666,7 +1668,7 @@ static int hls_window(AVFormatContext *s, int last, VariantStream *vs)
             goto fail;
         }
         ff_hls_write_playlist_header(hls->sub_m3u8_out, hls->version, hls->allowcache,
-                                     target_duration, sequence, PLAYLIST_TYPE_NONE, 0);
+                                     target_duration, sequence, PLAYLIST_TYPE_NONE, 0, hls->start_offset);
         for (en = vs->segments; en; en = en->next) {
             ret = ff_hls_write_file_entry(hls->sub_m3u8_out, 0, byterange_mode,
                                           en->duration, 0, en->size, en->pos,
@@ -3155,6 +3157,7 @@ static const AVOption options[] = {
     {"hls_segment_options","set segments files format options of hls", OFFSET(format_options), AV_OPT_TYPE_DICT, {.str = NULL},  0, 0,    E},
     {"hls_segment_size", "maximum size per segment file, (in bytes)",  OFFSET(max_seg_size),    AV_OPT_TYPE_INT,    {.i64 = 0},               0,       INT_MAX,   E},
     {"hls_key_info_file",    "file with key URI and key file path", OFFSET(key_info_file),      AV_OPT_TYPE_STRING, {.str = NULL},            0,       0,         E},
+    {"hls_start_time", "set EXT-X-START:TIME-OFFSET",           OFFSET(start_offset),    AV_OPT_TYPE_FLOAT,  {.dbl = 0},     -FLT_MAX, FLT_MAX, E},
     {"hls_enc",    "enable AES128 encryption support", OFFSET(encrypt),      AV_OPT_TYPE_BOOL, {.i64 = 0},            0,       1,         E},
     {"hls_enc_key",    "hex-coded 16 byte key to encrypt the segments", OFFSET(key),      AV_OPT_TYPE_STRING, .flags = E},
     {"hls_enc_key_url",    "url to access the key to decrypt the segments", OFFSET(key_url),      AV_OPT_TYPE_STRING, {.str = NULL},            0,       0,         E},
